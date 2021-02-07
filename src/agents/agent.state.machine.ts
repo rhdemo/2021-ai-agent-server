@@ -18,17 +18,17 @@ type AgentStateData = IStateDeclaration<AgentStateMachine>;
 export default class AgentStateMachine extends StateMachine {
   text: string = StateMachine.INITIAL
 
-  @StateMachine.extend(StateMachine.INITIAL, Object.values(AgentState))
+  @StateMachine.extend(AgentState.Connecting, Object.values(AgentState))
   [AgentState.Waiting]: AgentStateData = {
     text: AgentState.Waiting
   }
 
-  @StateMachine.extend(StateMachine.INITIAL, [AgentState.WaitingForConfig, AgentState.Connected])
+  @StateMachine.extend(StateMachine.INITIAL, [AgentState.WaitingForConfig, AgentState.Connected, AgentState.Waiting])
   [AgentState.Connecting]: AgentStateData = {
     text: AgentState.Connected
   }
 
-  @StateMachine.extend(AgentState.Connecting, [AgentState.Connected, AgentState.WaitingForConfig])
+  @StateMachine.extend(AgentState.Connecting, [AgentState.Connected, AgentState.WaitingForConfig, AgentState.Connected])
   [AgentState.Connected]: AgentStateData = {
     text: AgentState.Connected
   }

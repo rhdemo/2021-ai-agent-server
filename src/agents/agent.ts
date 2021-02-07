@@ -28,7 +28,7 @@ export default class Agent extends EventEmitter {
       fsm.onEnter(stateName, () => log.info(`Agent ${this.getAgentUUID()} entering state: ${stateName}`))
     })
 
-    fsm.onEnter(AgentState.Connecting, (delay?: number) => this.connect(delay))
+    fsm.onEnter(AgentState.Connecting, () => this.connect())
 
     fsm.onEnter(AgentState.Connected, () => {
       process.nextTick(() => {
@@ -40,10 +40,6 @@ export default class Agent extends EventEmitter {
 
     fsm.onEnter(AgentState.WaitingForConfig, () => {
       log.info(`Agent ${options.uuid} waiting for config`)
-    })
-
-    fsm.onEnter(AgentState.Waiting, (arg) => {
-      log.info(`Agent ${this.getAgentUUID()} entered waiting state: %j`, arg)
     })
 
     fsm.onEnter(AgentState.Positioning, () => {
@@ -116,7 +112,8 @@ export default class Agent extends EventEmitter {
       log.error(e)
     }
 
-    this.fsm.transitTo(AgentState.Connecting, 1000)
+    this.fsm.transitTo(AgentState.Waiting)
+    setTimeout(() => this.fsm.transitTo(AgentState.Connecting), 1000)
   }
 
   private onWsMessage(message: WebSocket.Data) {
