@@ -4,7 +4,7 @@ import { StateMachine, IStateDeclaration } from '@evanshortiss/tstate-machine'
 export enum AgentState {
   Connecting = 'Connecting',
   Connected = 'Connected',
-  Waiting = 'Waiting',
+  Disconnected = 'Disconnected',
   WaitingForConfig = 'WaitingForConfig',
   Positioning = 'Positioning',
   WaitingForTurn = 'WaitingForTurn',
@@ -16,52 +16,74 @@ export enum AgentState {
 type AgentStateData = IStateDeclaration<AgentStateMachine>;
 
 export default class AgentStateMachine extends StateMachine {
-  text: string = StateMachine.INITIAL
 
-  @StateMachine.extend(AgentState.Connecting, Object.values(AgentState))
-  [AgentState.Waiting]: AgentStateData = {
-    text: AgentState.Waiting
-  }
+  /**
+   * Connecting state can transition to:
+   *  * "Connected" if the socket connects successfully.
+   *  * "Disconnected" if connection fails and a reconnect attempt should be made.
+   */
+  @StateMachine.extend(StateMachine.INITIAL, [AgentState.Connected, AgentState.Disconnected])
+  [AgentState.Connecting]: AgentStateData = {}
 
-  @StateMachine.extend(StateMachine.INITIAL, [AgentState.WaitingForConfig, AgentState.Connected, AgentState.Waiting])
-  [AgentState.Connecting]: AgentStateData = {
-    text: AgentState.Connected
-  }
+  /**
+   * Waiting state always transitions to "Connecting" since it's exclusively
+   * used to stagger reconnect attempts (for now)
+   */
+  @StateMachine.extend(StateMachine.INITIAL, [AgentState.Connecting])
+  [AgentState.Disconnected]: AgentStateData = {}
 
-  @StateMachine.extend(AgentState.Connecting, [AgentState.Connected, AgentState.WaitingForConfig, AgentState.Connected])
-  [AgentState.Connected]: AgentStateData = {
-    text: AgentState.Connected
-  }
+  /**
+   * Connected state can transition to:
+   *  * "Disconnected" if the connection drops
+   *  * "WaitingForConfig" while it awaits an initial server config
+   */
+  @StateMachine.extend(StateMachine.INITIAL, [AgentState.Disconnected, AgentState.WaitingForConfig])
+  [AgentState.Connected]: AgentStateData = {}
 
-  @StateMachine.extend(AgentState.Connected, [AgentState.Connecting, AgentState.Positioning, AgentState.WaitingForTurn, AgentState.Attacking, AgentState.Waiting])
-  [AgentState.WaitingForConfig]: AgentStateData = {
-    text: AgentState.WaitingForConfig
-  }
+  /**
+   * WaitingForConfig state can transition to:
+   *  * "Disconnected" if the connection drops, or the game is "paused"/"stopped"
+   *  * "Positioning" if the Agent has not yet set their ship positions
+   *  * "WaitingForTurn"/"Attacking" if positions are set and game is "active"
+   */
+  @StateMachine.extend(StateMachine.INITIAL, [AgentState.Disconnected, AgentState.Positioning, AgentState.WaitingForTurn, AgentState.Attacking])
+  [AgentState.WaitingForConfig]: AgentStateData = {}
 
-  @StateMachine.extend(AgentState.WaitingForConfig, [AgentState.Connecting, AgentState.WaitingForTurn, AgentState.Attacking, AgentState.Waiting])
-  [AgentState.Positioning]: AgentStateData = {
-    text: AgentState.Positioning
-  }
+  /**
+   * Positioning state can transition to:
+   *  * "Disconnected" if the connection drops, or the game is "paused"/"stopped"
+   *  * "WaitingForTurn"/"Attacking" when positions are accepted and game is "active"
+   */
+  @StateMachine.extend(StateMachine.INITIAL, [AgentState.Disconnected, AgentState.WaitingForTurn, AgentState.Attacking])
+  [AgentState.Positioning]: AgentStateData = {}
 
-  @StateMachine.extend(AgentState.Positioning, [AgentState.Connecting, AgentState.Attacking, AgentState.LostGame, AgentState.Waiting])
-  [AgentState.WaitingForTurn]: AgentStateData = {
-    text: AgentState.WaitingForTurn
-  }
+  /**
+   * Positioning state can transition to:
+   *  * "Disconnected" if the connection drops, or the game is "paused"/"stopped"
+   *  * "Attacking" when the Agent turn arrives
+   *  * "WaitingForConfig" when the the admins pause the game
+   *  * "LostGame" if the opponent has sunk all the Agent ships
+   */
+  @StateMachine.extend(StateMachine.INITIAL, [AgentState.Disconnected, AgentState.Attacking,  AgentState.WaitingForConfig, AgentState.LostGame])
+  [AgentState.WaitingForTurn]: AgentStateData = {}
 
-  @StateMachine.extend(AgentState.WaitingForTurn, [AgentState.Connecting, AgentState.WaitingForTurn, AgentState.WonGame, AgentState.Waiting])
-  [AgentState.Attacking]: AgentStateData = {
-    text: AgentState.Attacking
-  }
+  /**
+   * Attacking state can transition to:
+   *  * "Disconnected" if the connection drops, or the game is "paused"/"stopped"
+   *  * "WaitingForTurn" when the Agent has attacked and turns change
+   *  * "WaitingForConfig" when the the admins pause the game
+   *  * "WonGame" if the Agent has sunk all the opponent ships
+   */
+  @StateMachine.extend(StateMachine.INITIAL, [AgentState.Disconnected, AgentState.WaitingForTurn, AgentState.WaitingForConfig, AgentState.WonGame])
+  [AgentState.Attacking]: AgentStateData = {}
 
-  @StateMachine.extend(AgentState.WaitingForTurn)
-  [AgentState.LostGame]: AgentStateData = {
-    text: AgentState.LostGame
-  }
-
-  @StateMachine.extend(AgentState.Attacking)
-  [AgentState.WonGame]: AgentStateData = {
-    text: AgentState.WonGame
-  }
+  /**
+   * Win/Lost states do not transition to another state.
+   */
+  @StateMachine.extend(StateMachine.INITIAL)
+  [AgentState.LostGame]: AgentStateData = {}
+  @StateMachine.extend(StateMachine.INITIAL)
+  [AgentState.WonGame]: AgentStateData = {}
 
   @StateMachine.hide
   protected get $next(): Array<string> {

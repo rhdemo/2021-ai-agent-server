@@ -112,7 +112,7 @@ export default class Agent extends EventEmitter {
       log.error(e)
     }
 
-    this.fsm.transitTo(AgentState.Waiting)
+    this.fsm.transitTo(AgentState.Disconnected)
     setTimeout(() => this.fsm.transitTo(AgentState.Connecting), 1000)
   }
 
@@ -160,7 +160,7 @@ export default class Agent extends EventEmitter {
     log.trace(`Agent ${this.getAgentUUID()} stored new config: %j`, message)
 
     if (state === 'paused' || state === 'stopped') {
-      this.fsm.transitTo(AgentState.Waiting, state)
+      this.fsm.transitTo(AgentState.WaitingForConfig, state)
     } else if (this.hasSetShipPositions()) {
       // Agent has successfully set positions, prepare to attack, or wait for turn
       if (this.isAgentTurn()) {
