@@ -9,6 +9,7 @@ export type AgentInitialisationOptions = {
   wsUrl: string
   username: string
   gridSize: number
+  gameId: string
 }
 
 export default class Agent extends EventEmitter {
@@ -33,7 +34,11 @@ export default class Agent extends EventEmitter {
     fsm.onEnter(AgentState.Connected, () => {
       process.nextTick(() => {
         log.info(`Agent ${this.getAgentUUID()} sending connection payload`)
-        this.send(MessageType.Outgoing.Connection, this.options)
+        this.send(MessageType.Outgoing.Connection, {
+          username: options.username,
+          playerId: options.uuid,
+          gameId: options.gameId
+        })
         this.fsm.transitTo(AgentState.WaitingForConfig)
       })
     })
@@ -100,6 +105,7 @@ export default class Agent extends EventEmitter {
       this.socket = new WebSocket(this.options.wsUrl)
       this.socket.on('open', () => this.fsm.transitTo(AgentState.Connected))
       this.socket.on('error', (e) => this.onWsError(e))
+      this.socket.on('close', (e) => console.log('WSS CLOSED', e))
       this.socket.on('message', (message) => this.onWsMessage(message))
     }, delay)
   }
@@ -124,6 +130,8 @@ export default class Agent extends EventEmitter {
       this.onConfigurationPayload(parsedMessage as IncomingMessageStruct<ConfigMessagePayload>)
     } else if (parsedMessage.type === MessageType.Incoming.AttackResult) {
       this.onAttackResultPayload(parsedMessage as IncomingMessageStruct<ConfigMessagePayload & AttackMessagePayload>)
+    } else if (parsedMessage.type === MessageType.Incoming.Heartbeat) {
+      log.trace(`received heartbeat for agent ${this.getAgentUUID()}`)
     } else {
       log.warn(`agent ${this.getAgentUUID()} received a message that could not be handled: %j`, parsedMessage)
     }
@@ -138,6 +146,10 @@ export default class Agent extends EventEmitter {
    * @param message
    */
   private onAttackResultPayload(message: IncomingMessageStruct<ConfigMessagePayload & AttackMessagePayload>) {
+    // Store the new config
+    this.config = message
+
+    log.trace(`agent ${this.getAgentUUID()} received attack response: %j`, message)
     const { winner, activePlayer } = message.data.match
     if (winner && winner === this.getAgentUUID()) {
       this.fsm.transitTo(AgentState.WonGame)
@@ -220,10 +232,14 @@ export default class Agent extends EventEmitter {
     let attackOrigin: CellPosition|undefined = undefined
 
     for (let x = 0; x <= gridSize-1; x++) {
-      if (attackOrigin) { break }
+      if (attackOrigin) {
+        break
+      }
 
       for (let y = 0; y <= gridSize-1; y++) {
-        const existingAttack = attacks.find(atk => (atk.attack.origin[0] === x && atk.attack.origin[1] === y))
+        const existingAttack = attacks.find(atk => {
+          return (atk.attack.origin[0] === x && atk.attack.origin[1] === y)
+        })
 
         if (!existingAttack) {
           attackOrigin = [x, y]
@@ -239,7 +255,7 @@ export default class Agent extends EventEmitter {
       log.info(`Agent ${this.getAgentUUID()} attacking cell: %j`, attackOrigin)
       this.send(MessageType.Outgoing.Attack, {
         type: '1x1',
-        origin: [1, 0],
+        origin: attackOrigin,
         orientation: 'horizontal'
       })
     }

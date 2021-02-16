@@ -12,7 +12,7 @@ const config = {
   // This is the grid size for the game, e.g "5" would produce a 5x5 grid
   GAME_GRID_SIZE: get('GAME_GRID_SIZE').default(5).asIntPositive(),
 
-  GAME_SERVER_URL: get('GAME_SERVER_URL').default('ws://game-server.frontend.svc.cluster.local').asUrlString(),
+  GAME_SERVER_URL: get('GAME_SERVER_URL').default('ws://game-server.frontend.svc.cluster.local:8080/game').asUrlString(),
 
   DATAGRID_GAME_DATA_STORE: get('DATAGRID_GAME_DATA_STORE')
     .default('game')

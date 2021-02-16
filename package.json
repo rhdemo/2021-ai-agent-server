@@ -1,12 +1,12 @@
 {
-  "name": "2021-ai-agent",
+  "name": "2021-ai-agent-server",
   "version": "1.0.0",
   "description": "",
   "private": true,
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "NODE_ENV=dev LOG_LEVEL=trace nodemon -e ts -x ts-node src/index.ts | pino-pretty -t",
+    "dev": "NODE_ENV=dev LOG_LEVEL=trace GAME_SERVER_URL=ws://summit-frontend-wss:3000/game nodemon -e ts -x ts-node src/index.ts | pino-pretty -t",
     "start": "node build/index.js",
     "test": "ts-node node_modules/tape/bin/tape test/*.ts"
   },

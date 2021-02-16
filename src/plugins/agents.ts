@@ -16,17 +16,18 @@ const agentPlugin: FastifyPluginCallback<AgentPluginOptions> = (
   type CreateAgentBody = {
     username: string
     uuid: string
+    gameId: string
   }
 
   server.post<{ Body: CreateAgentBody }>('/agent', async (req, reply) => {
-    const { uuid, username } = req.body
+    const { uuid, username, gameId } = req.body
 
     if (!uuid || !username) {
       reply.status(400).send({
         info: '"uuid" and "username" are required to create an agent'
       })
     } else {
-      createAgent({ uuid, username, gridSize: GAME_GRID_SIZE, wsUrl: GAME_SERVER_URL })
+      createAgent({ uuid, username, gameId, gridSize: GAME_GRID_SIZE, wsUrl: GAME_SERVER_URL })
       reply.send({
         info: 'successfully created agent'
       })
