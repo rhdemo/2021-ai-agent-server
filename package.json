@@ -41,6 +41,7 @@
     "env-var": "~7.0.0",
     "fastify": "~3.11.0",
     "fastify-plugin": "~3.0.0",
+    "got": "^11.8.1",
     "humanize-duration": "~3.25.1",
     "make-promises-safe": "^5.1.0",
     "pino": "~6.11.0",

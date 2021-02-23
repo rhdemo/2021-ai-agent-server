@@ -1,4 +1,3 @@
-
 export namespace MessageType {
   export enum Outgoing {
     Connection = 'connection',
@@ -29,30 +28,51 @@ export type ConfigMessagePayload = {
     uuid: string;
     date: string;
     state: 'lobby' | 'active' | 'paused' | 'stopped';
-  },
+  };
+  opponent: {
+    username: string;
+    board: {
+      // A ship will be in this object if it has been sunk
+      [key in ShipType]?: {
+        type: ShipType;
+        origin: CellPosition;
+        orientation: 'horizontal' | 'vertical';
+        cells: {
+          origin: CellPosition;
+          hit: boolean;
+        }[];
+      };
+    };
+  };
   player: {
     uuid: string;
     username: string;
     match?: string;
     board?: {
       valid: boolean;
-    },
+    };
     attacks: {
       ts: number;
       attack: {
         human: boolean;
         origin: CellPosition;
       };
-    }[]
-  },
+      results: {
+        origin: CellPosition;
+        hit: boolean;
+        destroyed?: boolean;
+        type?: ShipType;
+      }[];
+    }[];
+  };
   match: {
-    uuid: string
-    ready: boolean
+    uuid: string;
+    ready: boolean;
     // Changes between the player and opponent UUIDs
-    activePlayer: string
+    activePlayer: string;
     // Eventually gets set to the player or opponent UUID
-    winner?: string
-  }
+    winner?: string;
+  };
 };
 
 export type AttackMessagePayload = {
@@ -67,6 +87,6 @@ export type AttackMessagePayload = {
 };
 
 export interface IncomingMessageStruct<T> {
-  type: MessageType.Incoming,
-  data: unknown & T
+  type: MessageType.Incoming;
+  data: unknown & T;
 }
