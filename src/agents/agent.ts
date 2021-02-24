@@ -363,7 +363,7 @@ export default class Agent extends EventEmitter {
         // frustration. Similarly, read this for a laugh:
         // https://twitter.com/sharifshameem/status/1344246374737399808
         const processingTime = Date.now() - attackStartTs;
-        const delay = Math.min(0, MIN_ATTACK_DELAY - processingTime);
+        const delay = Math.max(0, MIN_ATTACK_DELAY - processingTime);
 
         setTimeout(() => {
           this.send(MessageType.Outgoing.Attack, {
