@@ -11,7 +11,6 @@ import {
 import log from '../log';
 import AgentStateMachine, { AgentState } from './agent.state.machine';
 import { CellState, generateInitialBoardState, getNextMove } from '../ml';
-import { logger } from 'env-var';
 
 export type AgentInitialisationOptions = {
   uuid: string;
@@ -314,7 +313,7 @@ export default class Agent extends EventEmitter {
 
       const x = atk.attack.origin[0];
       const y = atk.attack.origin[1];
-      const isHit = atk.results.reduce((ret, val) => ret && val.hit, false);
+      const isHit = atk.results.reduce((ret, val) => ret && val.hit, true);
 
       boardState[x][y] = isHit ? CellState.Hit : CellState.Miss;
     }
