@@ -248,15 +248,19 @@ export default class Agent extends EventEmitter {
   private generateShipPositions() {
     // TODO: randomise or call out to AI service to choose
     return {
-      Submarine: {
+      [ShipType.Carrier]: {
+        origin: [4, 0],
+        orientation: 'vertical'
+      },
+      [ShipType.Submarine]: {
         origin: [0, 0],
         orientation: 'horizontal'
       },
-      Destroyer: {
-        origin: [2, 1],
+      [ShipType.Destroyer]: {
+        origin: [1, 1],
         orientation: 'horizontal'
       },
-      Battleship: {
+      [ShipType.Battleship]: {
         origin: [0, 1],
         orientation: 'vertical'
       }

@@ -16,6 +16,7 @@ export namespace MessageType {
 }
 
 export enum ShipType {
+  Carrier = 'Carrier',
   Battleship = 'Battleship',
   Destroyer = 'Destroyer',
   Submarine = 'Submarine'
