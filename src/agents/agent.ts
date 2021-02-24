@@ -11,6 +11,7 @@ import {
 import log from '../log';
 import AgentStateMachine, { AgentState } from './agent.state.machine';
 import { CellState, generateInitialBoardState, getNextMove } from '../ml';
+import { MIN_ATTACK_DELAY } from '../config';
 
 export type AgentInitialisationOptions = {
   uuid: string;
@@ -301,6 +302,8 @@ export default class Agent extends EventEmitter {
       );
     }
 
+    const attackStartTs = Date.now();
+
     log.debug(`Agent ${this.getAgentUUID()} determining attack cell`);
 
     const boardState = generateInitialBoardState();
@@ -353,11 +356,22 @@ export default class Agent extends EventEmitter {
           `Agent ${this.getAgentUUID()} attacking cell: %j`,
           attackOrigin
         );
-        this.send(MessageType.Outgoing.Attack, {
-          type: '1x1',
-          origin: attackOrigin,
-          orientation: 'horizontal'
-        });
+
+        // The processing time for the prediction service can vary, but we
+        // need to make it seem as though the agent is "thinking" before it
+        // plays its turn. Enforcing a minimum delay will reduce player
+        // frustration. Similarly, read this for a laugh:
+        // https://twitter.com/sharifshameem/status/1344246374737399808
+        const processingTime = Date.now() - attackStartTs;
+        const delay = Math.min(0, MIN_ATTACK_DELAY - processingTime);
+
+        setTimeout(() => {
+          this.send(MessageType.Outgoing.Attack, {
+            type: '1x1',
+            origin: attackOrigin,
+            orientation: 'horizontal'
+          });
+        }, delay);
       }
     }
   }
