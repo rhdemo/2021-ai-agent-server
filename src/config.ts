@@ -20,7 +20,7 @@ const config = {
     .default('http://bataai.ai.svc.cluster.local:8080/')
     .asUrlString(),
 
-  MIN_ATTACK_DELAY: get('MIN_ATTACK_DELAY').default(2500).asIntPositive(),
+  MIN_ATTACK_DELAY: get('MIN_ATTACK_DELAY').default(3500).asIntPositive(),
 
   DATAGRID_GAME_DATA_STORE: get('DATAGRID_GAME_DATA_STORE')
     .default('game')
