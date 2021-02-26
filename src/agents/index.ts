@@ -1,19 +1,35 @@
+import { GAME_GRID_SIZE, GAME_SERVER_URL } from '../config';
+import log from '../log';
+import Agent from './agent';
 
-import log from "../log";
-import Agent, { AgentInitialisationOptions } from "./agent";
+const agents = new Map<string, Agent>();
 
-const agents = new Map<string, Agent>()
+type AgentOptions = {
+  uuid: string;
+  username: string;
+  gameId: string;
+};
 
-export function createAgent (opts: AgentInitialisationOptions) {
-  const { uuid } = opts
+export function createAgent(opts: AgentOptions) {
+  const { uuid } = opts;
+
   if (agents.has(uuid)) {
-    throw new Error(`an agent with the UUID ${uuid} already exists`)
+    throw new Error(`an agent with the UUID ${uuid} already exists`);
   } else {
-    log.info('Creating agent with opts: %j', opts)
-    agents.set(uuid, new Agent(opts))
+    log.info('Creating agent with opts: %j', opts);
+
+    const agent = new Agent({
+      ...opts,
+      wsUrl: GAME_SERVER_URL,
+      gridSize: GAME_GRID_SIZE,
+      // Remove agent from the Map the they have won/lost
+      onRetired: () => agents.delete(uuid)
+    });
+
+    agents.set(uuid, agent);
   }
 }
 
-export function getAgentCount () {
-  return agents.size
+export function getAgentCount() {
+  return agents.size;
 }

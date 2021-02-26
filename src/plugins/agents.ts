@@ -1,8 +1,7 @@
 import { FastifyPluginCallback } from 'fastify';
 import fp from 'fastify-plugin';
-import { createAgent } from '../agents/'
+import { createAgent } from '../agents/';
 import { GAME_GRID_SIZE, GAME_SERVER_URL } from '../config';
-
 
 export interface AgentPluginOptions {
   version: string;
@@ -14,25 +13,25 @@ const agentPlugin: FastifyPluginCallback<AgentPluginOptions> = (
   done
 ) => {
   type CreateAgentBody = {
-    username: string
-    uuid: string
-    gameId: string
-  }
+    username: string;
+    uuid: string;
+    gameId: string;
+  };
 
   server.post<{ Body: CreateAgentBody }>('/agent', async (req, reply) => {
-    const { uuid, username, gameId } = req.body
+    const { uuid, username, gameId } = req.body;
 
-    if (!uuid || !username) {
+    if (!uuid || !gameId || !username) {
       reply.status(400).send({
-        info: '"uuid" and "username" are required to create an agent'
-      })
+        info: '"uuid", "gameId" and "username" are required to create an agent'
+      });
     } else {
-      createAgent({ uuid, username, gameId, gridSize: GAME_GRID_SIZE, wsUrl: GAME_SERVER_URL })
+      createAgent({ uuid, username, gameId });
       reply.send({
         info: 'successfully created agent'
-      })
+      });
     }
-  })
+  });
 
   done();
 };

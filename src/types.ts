@@ -24,6 +24,26 @@ export enum ShipType {
 
 export type CellPosition = [number, number];
 
+export type ShipPositionData = {
+  origin: CellPosition;
+  orientation: 'horizontal' | 'vertical';
+};
+
+export type ShipsLayoutData = {
+  [key in ShipType]: ShipPositionData;
+};
+
+export type ShipStateData = {
+  // A ship will be in this object if it has been sunk
+  [key in ShipType]: {
+    type: ShipType;
+    cells: {
+      origin: CellPosition;
+      hit: boolean;
+    }[];
+  } & ShipPositionData;
+};
+
 export type ConfigMessagePayload = {
   game: {
     uuid: string;
@@ -32,18 +52,7 @@ export type ConfigMessagePayload = {
   };
   opponent: {
     username: string;
-    board: {
-      // A ship will be in this object if it has been sunk
-      [key in ShipType]?: {
-        type: ShipType;
-        origin: CellPosition;
-        orientation: 'horizontal' | 'vertical';
-        cells: {
-          origin: CellPosition;
-          hit: boolean;
-        }[];
-      };
-    };
+    board: ShipStateData;
   };
   player: {
     uuid: string;
@@ -51,6 +60,7 @@ export type ConfigMessagePayload = {
     match?: string;
     board?: {
       valid: boolean;
+      positions: ShipStateData;
     };
     attacks: {
       ts: number;

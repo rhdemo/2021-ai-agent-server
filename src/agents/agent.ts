@@ -6,6 +6,7 @@ import {
   ConfigMessagePayload,
   IncomingMessageStruct,
   MessageType,
+  ShipsLayoutData,
   ShipType
 } from '../types';
 import log from '../log';
@@ -19,9 +20,10 @@ export type AgentInitialisationOptions = {
   username: string;
   gridSize: number;
   gameId: string;
+  onRetired: () => void;
 };
 
-export default class Agent extends EventEmitter {
+export default class Agent {
   private fsm: AgentStateMachine;
   private socket: WebSocket | undefined;
   private config:
@@ -31,8 +33,6 @@ export default class Agent extends EventEmitter {
     | undefined;
 
   constructor(private options: AgentInitialisationOptions) {
-    super();
-
     log.info(
       `creating a new agent with uuid ${options.uuid} and username ${options.username}`
     );
@@ -46,68 +46,35 @@ export default class Agent extends EventEmitter {
       );
     });
 
-    fsm.onEnter(AgentState.Connecting, () => this.connect());
-
-    fsm.onEnter(AgentState.Connected, () => {
-      process.nextTick(() => {
-        log.info(`Agent ${this.getAgentUUID()} sending connection payload`);
-        this.send(MessageType.Outgoing.Connection, {
-          username: options.username,
-          playerId: options.uuid,
-          gameId: options.gameId
-        });
-        this.fsm.transitTo(AgentState.WaitingForConfig);
-      });
-    });
-
-    fsm.onEnter(AgentState.WaitingForConfig, () => {
-      log.info(`Agent ${options.uuid} waiting for config`);
-    });
-
-    fsm.onEnter(AgentState.Positioning, () => {
-      this.send(
-        MessageType.Outgoing.ShipPositions,
-        this.generateShipPositions()
-      );
-    });
-
-    fsm.onEnter(AgentState.WaitingForTurn, () => {
-      log.info(`Agent ${options.uuid} waiting for their turn`);
-    });
-
-    fsm.onEnter(AgentState.Attacking, () => {
-      process.nextTick(() => this.attack());
-    });
-
-    fsm.onEnter(AgentState.LostGame, () => {
-      log.info(
-        `Agent ${this.getAgentUUID()} lost their match (${
-          this.config?.data.match.uuid
-        })`
-      );
-      this.socket?.close();
-    });
-
-    fsm.onEnter(AgentState.WonGame, () => {
-      log.info(
-        `Agent ${this.getAgentUUID()} won their match (${
-          this.config?.data.match.uuid
-        })`
-      );
-      this.socket?.close();
-    });
+    // Bind state transition event handlers
+    fsm.onEnter(AgentState.Connecting, () => this._callbackConnecting());
+    fsm.onEnter(AgentState.Connected, () => this._callbackConnected());
+    fsm.onEnter(AgentState.Disconnected, () => this._callbackDisconnected());
+    fsm.onEnter(AgentState.WaitingForConfig, () =>
+      this._callbackWaitForConfig()
+    );
+    fsm.onEnter(AgentState.Positioning, () => this._callbackPositioning());
+    fsm.onEnter(AgentState.WaitingForTurn, () => this._callbackWaitForTurn());
+    fsm.onEnter(AgentState.Attacking, () => this._callbackAttack());
+    fsm.onEnter(AgentState.LostGame, () => this._callbackGameOver(false));
+    fsm.onEnter(AgentState.WonGame, () => this._callbackGameOver(true));
 
     // Kick off the Agent lifecycle by entering a "connecting" state
-    fsm.transitTo('Connecting');
+    fsm.transitTo(AgentState.Connecting);
   }
 
   public getCurrentState() {
     return this.fsm.currentState;
   }
 
+  /**
+   * Once an agent has won/lost a game we need to retire it. This means
+   * disconnecting from the game server and informing
+   */
   public retire() {
     log.info(`Agent ${this.getAgentUUID()} is being retired`);
     this.socket?.close();
+    this.options.onRetired();
   }
 
   public getAgentUUID() {
@@ -115,11 +82,65 @@ export default class Agent extends EventEmitter {
   }
 
   /**
-   * Connect to the game websocket server, and configure websocket events.
-   * An optional "delay" parameter can be passed to stagger reconnection
-   * attempts if the game server happens to go down.
+   * The Agent must send a "Connection" payload any time they connect to the
+   * game server, even if it's a reconnection after being disconnected
    */
-  private connect(delay = 0) {
+  private _callbackConnected() {
+    // The state machine will fail to change state if fsm.transitTo is called
+    // in a callback. Use process.nextTick to delay the state change until
+    // after the StateMachine has finished executing the transition tasks
+    process.nextTick(() => {
+      log.info(`Agent ${this.getAgentUUID()} sending connection payload`);
+      this.send(MessageType.Outgoing.Connection, {
+        username: this.options.username,
+        playerId: this.options.uuid,
+        gameId: this.options.gameId
+      });
+      this.fsm.transitTo(AgentState.WaitingForConfig);
+    });
+  }
+
+  /**
+   * If the Agent is disconnected it'll wait a while and attempt to reconnect
+   */
+  private _callbackDisconnected() {
+    setTimeout(() => this.fsm.transitTo(AgentState.Connecting), 1500);
+  }
+
+  /**
+   * When the Agent wins/loses they "retire", i.e disconnect and trigger their
+   * onRetire callback to trigger cleanup or other events
+   * @param winner
+   */
+  private _callbackGameOver(winner: boolean) {
+    log.info(
+      `Agent ${this.getAgentUUID()} ${winner ? 'won' : 'lost'} their match (${
+        this.config?.data.match.uuid
+      })`
+    );
+    this.retire();
+  }
+
+  private _callbackAttack() {
+    this.attack();
+  }
+
+  private _callbackPositioning() {
+    this.send(MessageType.Outgoing.ShipPositions, this.getShipPositions());
+  }
+
+  private _callbackWaitForConfig() {
+    log.info(`Agent ${this.getAgentUUID()} waiting for config`);
+  }
+
+  private _callbackWaitForTurn() {
+    log.info(`Agent ${this.getAgentUUID()} waiting for their turn`);
+  }
+
+  /**
+   * Connect to the game websocket server, and configure websocket events.
+   */
+  private _callbackConnecting() {
     const { uuid } = this.options;
 
     if (this.socket) {
@@ -129,30 +150,31 @@ export default class Agent extends EventEmitter {
 
     log.info(`Agent ${uuid} connecting to ${this.options.wsUrl}`);
 
-    setTimeout(() => {
-      this.socket = new WebSocket(this.options.wsUrl);
-      this.socket.on('open', () => this.fsm.transitTo(AgentState.Connected));
-      this.socket.on('error', (e) => this.onWsError(e));
-      this.socket.on('close', (e) => console.log('WSS CLOSED', e));
-      this.socket.on('message', (message) => this.onWsMessage(message));
-    }, delay);
+    this.socket = new WebSocket(this.options.wsUrl);
+    this.socket.on('open', () => this.fsm.transitTo(AgentState.Connected));
+    this.socket.on('error', (e) => this.onWsError(e));
+    this.socket.on('close', (e) =>
+      log.trace(`Agent ${this.getAgentUUID()} WS closed with code: %s`, e)
+    );
+    this.socket.on('message', (message) => this.onWsMessage(message));
   }
 
-  private onWsError(e: number | Error) {
-    if (typeof e === 'number') {
-      log.error(
-        `socket for player ${this.options.uuid} closed with code: %s`,
-        e
-      );
-    } else {
-      log.error(`socket for player ${this.options.uuid} closed due to error:`);
-      log.error(e);
-    }
+  /**
+   * If a WebSocket error occurs then trigger a "Disconnected" state transition
+   * to reestablish a connection and reset the connection with the game server
+   * @param e
+   */
+  private onWsError(e: Error) {
+    log.error(`socket for player ${this.options.uuid} closed due to error:`);
+    log.error(e);
 
     this.fsm.transitTo(AgentState.Disconnected);
-    setTimeout(() => this.fsm.transitTo(AgentState.Connecting), 1000);
   }
 
+  /**
+   * Process data sent by the socket server to this Agent instance.
+   * @param message
+   */
   private onWsMessage(message: WebSocket.Data) {
     // TODO try/catch error handling on this, and other validation
     const parsedMessage = JSON.parse(
@@ -222,9 +244,9 @@ export default class Agent extends EventEmitter {
 
     if (state === 'paused' || state === 'stopped') {
       this.fsm.transitTo(AgentState.WaitingForConfig, state);
-    } else if (this.hasSetShipPositions()) {
+    } else if (this.hasSetValidShipPositions()) {
       // Agent has successfully set positions, prepare to attack, or wait for turn
-      if (this.isAgentTurn()) {
+      if (this.isAppropriateToAttack()) {
         this.fsm.transitTo(AgentState.Attacking);
       } else {
         this.fsm.transitTo(AgentState.WaitingForTurn);
@@ -235,39 +257,65 @@ export default class Agent extends EventEmitter {
     }
   }
 
-  private isAgentTurn() {
+  /**
+   * The agent should only attempt to attack if it's their turn AND the
+   * overall game state is set to "active"
+   */
+  private isAppropriateToAttack() {
     const isTurn = this.config?.data.match.activePlayer === this.getAgentUUID();
     const isActive = this.config?.data.game.state === 'active';
 
     return isActive && isTurn;
   }
 
-  private hasSetShipPositions() {
+  /**
+   * Determines if the agent has set positions, and if those positions were
+   * considered valid by the game server.
+   */
+  private hasSetValidShipPositions() {
     return this.config?.data.player.board?.valid;
   }
 
-  private generateShipPositions() {
-    // TODO: randomise or call out to AI service to choose
-    return {
-      [ShipType.Carrier]: {
-        origin: [4, 0],
-        orientation: 'vertical'
-      },
-      [ShipType.Submarine]: {
-        origin: [0, 0],
-        orientation: 'horizontal'
-      },
-      [ShipType.Destroyer]: {
-        origin: [1, 1],
-        orientation: 'horizontal'
-      },
-      [ShipType.Battleship]: {
-        origin: [0, 1],
-        orientation: 'vertical'
-      }
-    };
+  /**
+   * Returns a ship positioning/layout that can be sent to the game server.
+   * By default the Agent will accept the randomised positions that the game
+   * server provides, but if those are missing it will use a preset layout
+   */
+  private getShipPositions(): ShipsLayoutData {
+    // The server should send back a random ship layout. The agent can choose
+    // to use this layout. If it's missing the agent will use a default
+    const serverSentPositions = this.config?.data.player.board?.positions;
+
+    if (!serverSentPositions) {
+      log.warn(`Agent ${this.getAgentUUID()} is using default ship layout.`);
+      return {
+        [ShipType.Carrier]: {
+          origin: [4, 0],
+          orientation: 'vertical'
+        },
+        [ShipType.Submarine]: {
+          origin: [0, 0],
+          orientation: 'horizontal'
+        },
+        [ShipType.Destroyer]: {
+          origin: [1, 1],
+          orientation: 'horizontal'
+        },
+        [ShipType.Battleship]: {
+          origin: [0, 1],
+          orientation: 'vertical'
+        }
+      };
+    } else {
+      return serverSentPositions;
+    }
   }
 
+  /**
+   * If the AI/Prediction service fails, then we need to fall back to a
+   * primitive attack strategy. This strategy attacks from top-left toward
+   * the bottom right of the opponent board.
+   */
   private _attackFallback() {
     log.warn(`Agent ${this.getAgentUUID()} is attempting attack fallback`);
     const { gridSize } = this.options;
@@ -295,6 +343,17 @@ export default class Agent extends EventEmitter {
     return attackOrigin;
   }
 
+  /**
+   * Attacking requires the agent to make a HTTP request to the AI/prediction
+   * service. The service will determine the best square to attack.
+   *
+   * To make a choice, the AI/prediction service requires us to send the known
+   * board state of the opponent in a specific format. This state is purely
+   * from the agent perspective, i.e it only knows:
+   *  - its hits
+   *  - its misses
+   *  - and which opponent ships it has sunk
+   */
   private async attack() {
     if (!this.config) {
       throw new Error(
@@ -376,6 +435,11 @@ export default class Agent extends EventEmitter {
     }
   }
 
+  /**
+   * Wrapper to ensure we don't attempt to send data on a closed socket.
+   * @param type
+   * @param data
+   */
   private send(type: MessageType.Outgoing, data: unknown) {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       log.trace(
