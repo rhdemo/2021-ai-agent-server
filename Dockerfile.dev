@@ -2,6 +2,11 @@ FROM node:14-alpine
 
 WORKDIR /usr/src/app
 
-USER node
-EXPOSE 3003
-CMD npm run dev
+# npm may require Git
+RUN apk add git
+
+COPY . .
+
+EXPOSE 3000
+ENV HUSKY_SKIP_HOOKS=1
+CMD npm i && npm run dev
