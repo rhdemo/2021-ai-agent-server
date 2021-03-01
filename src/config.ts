@@ -22,6 +22,8 @@ const config = {
 
   MIN_ATTACK_DELAY: get('MIN_ATTACK_DELAY').default(3500).asIntPositive(),
 
+  AGENT_SEND_DELAY: get('AGENT_SEND_DELAY').default(500).asIntPositive(),
+
   DATAGRID_GAME_DATA_STORE: get('DATAGRID_GAME_DATA_STORE')
     .default('game')
     .asString(),

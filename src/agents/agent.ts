@@ -1,5 +1,4 @@
 import WebSocket from 'ws';
-import { EventEmitter } from 'events';
 import {
   AttackMessagePayload,
   CellPosition,
@@ -12,7 +11,7 @@ import {
 import log from '../log';
 import AgentStateMachine, { AgentState } from './agent.state.machine';
 import { CellState, generateInitialBoardState, getNextMove } from '../ml';
-import { MIN_ATTACK_DELAY } from '../config';
+import { MIN_ATTACK_DELAY, AGENT_SEND_DELAY } from '../config';
 
 export type AgentInitialisationOptions = {
   uuid: string;
@@ -441,22 +440,26 @@ export default class Agent {
    * @param data
    */
   private send(type: MessageType.Outgoing, data: unknown) {
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      log.trace(
-        `Agent ${this.getAgentUUID()} sending "${type}" with payload: %j`,
-        data
-      );
-      this.socket.send(
-        JSON.stringify({
-          type,
+    // The game server enforces a mutex on message processing. Sometimes the
+    // agent is too fast and messages are rejected. Delay sending slightly.
+    setTimeout(() => {
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        log.trace(
+          `Agent ${this.getAgentUUID()} sending "${type}" with payload: %j`,
           data
-        })
-      );
-    } else {
-      log.warn(
-        `player agent ${this.getAgentUUID()} attempted to send "${type}" data when socket was not open: %j`,
-        data
-      );
-    }
+        );
+        this.socket.send(
+          JSON.stringify({
+            type,
+            data
+          })
+        );
+      } else {
+        log.warn(
+          `player agent ${this.getAgentUUID()} attempted to send "${type}" data when socket was not open: %j`,
+          data
+        );
+      }
+    }, AGENT_SEND_DELAY);
   }
 }
