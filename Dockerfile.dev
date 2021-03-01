@@ -2,15 +2,6 @@ FROM node:14-alpine
 
 WORKDIR /usr/src/app
 
-COPY package*.json /usr/src/app/
-
-# npm may require Git
-RUN apk add git
-
-RUN npm install
-
-COPY . .
-
 USER node
 EXPOSE 3003
 CMD npm run dev
