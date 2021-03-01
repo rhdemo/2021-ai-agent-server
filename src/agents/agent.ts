@@ -378,7 +378,7 @@ export default class Agent {
 
       const x = atk.attack.origin[0];
       const y = atk.attack.origin[1];
-      const isHit = atk.results.reduce((ret, val) => ret && val.hit, true);
+      const isHit = atk.result.hit;
 
       boardState[x][y] = isHit ? CellState.Hit : CellState.Miss;
     }

@@ -68,12 +68,12 @@ export type ConfigMessagePayload = {
         human: boolean;
         origin: CellPosition;
       };
-      results: {
+      result: {
         origin: CellPosition;
         hit: boolean;
         destroyed?: boolean;
         type?: ShipType;
-      }[];
+      };
     }[];
   };
   match: {
