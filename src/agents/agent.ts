@@ -356,7 +356,9 @@ export default class Agent {
    *  - and which opponent ships it has sunk
    */
   private async attack() {
-    if (!this.config) {
+    const { config } = this;
+
+    if (!config) {
       log.error(
         `Agent ${this.getAgentUUID()} cannot determine attack. No config data exists`
       );
@@ -369,8 +371,15 @@ export default class Agent {
     log.debug(`Agent ${this.getAgentUUID()} determining attack cell`);
 
     const boardState = generateInitialBoardState();
-    const hitShips = Object.keys(this.config.data.opponent.board) as ShipType[];
-    const attacks = this.config.data.player.attacks;
+    const hitShips = Object.keys(config.data.opponent.board).map((ship) => {
+      const { type, cells } = config.data.opponent.board[ship as ShipType];
+
+      return {
+        type,
+        cells: cells.map((c) => c.origin)
+      };
+    });
+    const attacks = config.data.player.attacks;
 
     attacks.forEach((atk) => {
       log.trace(

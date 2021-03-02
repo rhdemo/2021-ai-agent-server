@@ -1,6 +1,6 @@
 import { AI_SERVER_URL } from '../config';
 import log from '../log';
-import { ShipType } from '../types';
+import { CellPosition, ShipType } from '../types';
 import http from './http';
 
 const PREDICTION_URL = new URL('/prediction', AI_SERVER_URL).toString();
@@ -73,12 +73,12 @@ export function generateInitialBoardState(): BoardState {
 
 export async function getNextMove(
   boardState: BoardState,
-  destroyedShips: Array<ShipType>
+  destroyedShipsData: Array<{ type: ShipType; cells: CellPosition[] }>
 ): Promise<PredictionResponse> {
   try {
     const json = {
       board_state: boardState,
-      ship_types: destroyedShips
+      ship_types: destroyedShipsData
     };
 
     log.trace(`POST request to AI service at ${PREDICTION_URL}: %j`, json);
