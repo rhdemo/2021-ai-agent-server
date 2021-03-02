@@ -10,13 +10,34 @@ type AgentOptions = {
   gameId: string;
 };
 
-export function createAgent(opts: AgentOptions) {
-  const { uuid } = opts;
+export enum AgentCreationResponse {
+  Created,
+  Existed
+}
 
-  if (agents.has(uuid)) {
-    throw new Error(`an agent with the UUID ${uuid} already exists`);
+export function createAgent(opts: AgentOptions): AgentCreationResponse {
+  const { uuid, gameId } = opts;
+  const existingAgent = agents.get(uuid);
+
+  if (
+    existingAgent &&
+    existingAgent.getAgentUUID() === uuid &&
+    existingAgent.getAgentGameId() === gameId
+  ) {
+    log.info(
+      `An agent with the UUID ${uuid} for game ${gameId} already exists. Skipping creation.`
+    );
+
+    return AgentCreationResponse.Existed;
   } else {
-    log.info('Creating agent with opts: %j', opts);
+    if (existingAgent) {
+      log.warn(
+        `An agent with the UUID ${uuid} existed for a previous game. Deleting this stale agent.`
+      );
+      agents.delete(uuid);
+    }
+
+    log.info(`Creating agent ${uuid} with opts: %j`, opts);
 
     const agent = new Agent({
       ...opts,
@@ -27,6 +48,8 @@ export function createAgent(opts: AgentOptions) {
     });
 
     agents.set(uuid, agent);
+
+    return AgentCreationResponse.Created;
   }
 }
 

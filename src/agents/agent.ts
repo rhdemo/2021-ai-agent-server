@@ -22,6 +22,10 @@ export type AgentInitialisationOptions = {
   onRetired: () => void;
 };
 
+/**
+ * The Agent class represents an AI player. It uses an AgentStateMachine to
+ * govern its behaviour.
+ */
 export default class Agent {
   private fsm: AgentStateMachine;
   private socket: WebSocket | undefined;
@@ -32,10 +36,6 @@ export default class Agent {
     | undefined;
 
   constructor(private options: AgentInitialisationOptions) {
-    log.info(
-      `creating a new agent with uuid ${options.uuid} and username ${options.username}`
-    );
-
     const fsm = (this.fsm = new AgentStateMachine());
 
     // Configure logging for all state changes
@@ -78,6 +78,10 @@ export default class Agent {
 
   public getAgentUUID() {
     return this.options.uuid;
+  }
+
+  public getAgentGameId() {
+    return this.options.gameId;
   }
 
   /**
@@ -152,9 +156,7 @@ export default class Agent {
     this.socket = new WebSocket(this.options.wsUrl);
     this.socket.on('open', () => this.fsm.transitTo(AgentState.Connected));
     this.socket.on('error', (e) => this.onWsError(e));
-    this.socket.on('close', (e) =>
-      log.trace(`Agent ${this.getAgentUUID()} WS closed with code: %s`, e)
-    );
+    this.socket.on('close', (e) => this.onWsError(e));
     this.socket.on('message', (message) => this.onWsMessage(message));
   }
 
@@ -163,9 +165,9 @@ export default class Agent {
    * to reestablish a connection and reset the connection with the game server
    * @param e
    */
-  private onWsError(e: Error) {
-    log.error(`socket for player ${this.options.uuid} closed due to error:`);
-    log.error(e);
+  private onWsError(e: Error | number) {
+    log.error(`socket for player ${this.options.uuid} error/close:`);
+    log.error(e.toString());
 
     this.fsm.transitTo(AgentState.Disconnected);
   }
@@ -355,9 +357,11 @@ export default class Agent {
    */
   private async attack() {
     if (!this.config) {
-      throw new Error(
+      log.error(
         `Agent ${this.getAgentUUID()} cannot determine attack. No config data exists`
       );
+
+      return this.fsm.transitTo(AgentState.WaitingForConfig);
     }
 
     const attackStartTs = Date.now();
@@ -368,9 +372,7 @@ export default class Agent {
     const hitShips = Object.keys(this.config.data.opponent.board) as ShipType[];
     const attacks = this.config.data.player.attacks;
 
-    for (let i = 0; i < attacks.length; i++) {
-      const atk = attacks[i];
-
+    attacks.forEach((atk) => {
       log.trace(
         `Agent ${this.getAgentUUID()} updating board state based on attack: %j`,
         atk
@@ -381,7 +383,7 @@ export default class Agent {
       const isHit = atk.result.hit;
 
       boardState[x][y] = isHit ? CellState.Hit : CellState.Miss;
-    }
+    });
 
     log.trace(
       `Agent ${this.getAgentUUID()} board state for AI service: %j`,
@@ -410,11 +412,6 @@ export default class Agent {
           `Agent ${this.getAgentUUID()} was unable to determine a valid attack.`
         );
       } else {
-        log.info(
-          `Agent ${this.getAgentUUID()} attacking cell: %j`,
-          attackOrigin
-        );
-
         // The processing time for the prediction service can vary, but we
         // need to make it seem as though the agent is "thinking" before it
         // plays its turn. Enforcing a minimum delay will reduce player
@@ -423,11 +420,15 @@ export default class Agent {
         const processingTime = Date.now() - attackStartTs;
         const delay = Math.max(0, MIN_ATTACK_DELAY - processingTime);
 
+        log.info(
+          `Agent ${this.getAgentUUID()} attacking after ${delay}ms delay: %j`,
+          attackOrigin
+        );
+
         setTimeout(() => {
           this.send(MessageType.Outgoing.Attack, {
             type: '1x1',
-            origin: attackOrigin,
-            orientation: 'horizontal'
+            origin: attackOrigin
           });
         }, delay);
       }
