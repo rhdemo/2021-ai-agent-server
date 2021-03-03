@@ -1,4 +1,4 @@
-import WebSocket from 'ws';
+import WebSocket, { CloseEvent } from 'ws';
 import {
   AttackMessagePayload,
   CellPosition,
@@ -13,6 +13,8 @@ import AgentStateMachine, { AgentState } from './agent.state.machine';
 import { CellState, generateInitialBoardState, getNextMove } from '../ml';
 import { MIN_ATTACK_DELAY, AGENT_SEND_DELAY } from '../config';
 
+const NORMAL_WS_CLOSE = 1000;
+
 export type AgentInitialisationOptions = {
   uuid: string;
   wsUrl: string;
@@ -21,7 +23,6 @@ export type AgentInitialisationOptions = {
   gameId: string;
   onRetired: () => void;
 };
-
 /**
  * The Agent class represents an AI player. It uses an AgentStateMachine to
  * govern its behaviour.
@@ -72,7 +73,7 @@ export default class Agent {
    */
   public retire() {
     log.info(`Agent ${this.getAgentUUID()} is being retired`);
-    this.socket?.close();
+    this.socket?.close(NORMAL_WS_CLOSE);
     this.options.onRetired();
   }
 
@@ -107,7 +108,7 @@ export default class Agent {
    * If the Agent is disconnected it'll wait a while and attempt to reconnect
    */
   private _callbackDisconnected() {
-    setTimeout(() => this.fsm.transitTo(AgentState.Connecting), 1500);
+    setTimeout(() => this.fsm.transitTo(AgentState.Connecting), 5000);
   }
 
   /**
@@ -146,18 +147,30 @@ export default class Agent {
   private _callbackConnecting() {
     const { uuid } = this.options;
 
-    if (this.socket) {
-      log.debug(`closing old socket for player ${uuid}`);
-      this.socket.close();
-    }
-
     log.info(`Agent ${uuid} connecting to ${this.options.wsUrl}`);
 
     this.socket = new WebSocket(this.options.wsUrl);
     this.socket.on('open', () => this.fsm.transitTo(AgentState.Connected));
     this.socket.on('error', (e) => this.onWsError(e));
-    this.socket.on('close', (e) => this.onWsError(e));
+    this.socket.on('close', (code) => this.onWsClose(code));
     this.socket.on('message', (message) => this.onWsMessage(message));
+  }
+
+  /**
+   * If the socket is closed with an unexpected error then the agent must
+   * attempt to reconnect so the game can be finished.
+   * @param code
+   */
+  private onWsClose(code: number) {
+    if (code === NORMAL_WS_CLOSE) {
+      log.info(`Agent ${this.getAgentUUID()} socket closed normally`);
+    } else {
+      log.warn(
+        `Agent ${this.getAgentUUID()} socket closed abnormally with code ${code}`
+      );
+
+      this.fsm.transitTo(AgentState.Disconnected);
+    }
   }
 
   /**
@@ -166,10 +179,8 @@ export default class Agent {
    * @param e
    */
   private onWsError(e: Error | number) {
-    log.error(`socket for player ${this.options.uuid} error/close:`);
+    log.error(`socket for player ${this.options.uuid} error:`);
     log.error(e.toString());
-
-    this.fsm.transitTo(AgentState.Disconnected);
   }
 
   /**
