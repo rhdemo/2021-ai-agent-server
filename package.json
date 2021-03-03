@@ -37,7 +37,7 @@
     "typescript": "~4.1.3"
   },
   "dependencies": {
-    "@evanshortiss/tstate-machine": "^1.1.6",
+    "@evanshortiss/tstate-machine": "^2.0.1",
     "env-var": "~7.0.0",
     "fastify": "~3.11.0",
     "fastify-plugin": "~3.0.0",
