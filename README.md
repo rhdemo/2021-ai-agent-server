@@ -9,18 +9,13 @@ will use a random attack strategy.
 * Node.js v14
 * npm v6
 * Docker
+* Running [AI Service](https://github.com/sub-mod/bataai.git)
 
 ## Local Development
 
 Local development uses a Docker container that mounts in the *src/* directory.
 
-```bash
-./scripts/node.sh
-```
-
-If you'd like created Agents to obtain their moves from the
-[AI/prediction service](https://github.com/sub-mod/bataai.git) then you must
-set the `AI_SERVER_URL` variable:
+You must set the `AI_SERVER_URL` variable to a valid AI service URL:
 
 ```bash
 AI_SERVER_URL=http://your-ai.service.com/ ./scripts/node.sh

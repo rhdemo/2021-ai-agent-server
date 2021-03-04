@@ -1,80 +1,54 @@
 import { AI_SERVER_URL } from '../config';
 import log from '../log';
-import { CellPosition, ShipType } from '../types';
+import { AI, ShipType, CellPosition } from '../types';
 import http from './http';
 
 const PREDICTION_URL = new URL('/prediction', AI_SERVER_URL).toString();
 
-export enum CellState {
-  Hit = 2,
-  Miss = 1,
-  NotPlayed = -1
-}
-
-export type BoardState = [
-  [CellState, CellState, CellState, CellState, CellState],
-  [CellState, CellState, CellState, CellState, CellState],
-  [CellState, CellState, CellState, CellState, CellState],
-  [CellState, CellState, CellState, CellState, CellState],
-  [CellState, CellState, CellState, CellState, CellState]
-];
-
-export type PredictionResponse = {
-  prob: [
-    [number, number, number, number, number],
-    [number, number, number, number, number],
-    [number, number, number, number, number],
-    [number, number, number, number, number],
-    [number, number, number, number, number]
-  ];
-  x: number;
-  y: number;
-};
-
-export function generateInitialBoardState(): BoardState {
+export function generateInitialBoardState(): AI.BoardState {
   return [
     [
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed
     ],
     [
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed
     ],
     [
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed
     ],
     [
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed
     ],
     [
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed,
-      CellState.NotPlayed
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed,
+      AI.CellState.NotPlayed
     ]
   ];
 }
 
 export async function getNextMove(
-  boardState: BoardState,
+  boardState: AI.BoardState,
   destroyedShipsData: Array<{ type: ShipType; cells: CellPosition[] }>
-): Promise<PredictionResponse> {
+): Promise<AI.PredictionResponse | undefined> {
   try {
     const json = {
       board_state: boardState,
@@ -95,8 +69,9 @@ export async function getNextMove(
     );
 
     // TODO: validation and better error handling
-    return response.body as PredictionResponse;
+    return response.body as AI.PredictionResponse;
   } catch (e) {
-    throw e;
+    log.error('failed to obtain prediction for move service:');
+    log.error(e);
   }
 }

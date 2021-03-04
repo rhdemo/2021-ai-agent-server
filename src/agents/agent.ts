@@ -5,12 +5,14 @@ import {
   ConfigMessagePayload,
   IncomingMessageStruct,
   MessageType,
+  OutgoingAttack,
   ShipsLayoutData,
-  ShipType
+  ShipType,
+  AI
 } from '../types';
 import log from '../log';
 import AgentStateMachine, { AgentState } from './agent.state.machine';
-import { CellState, generateInitialBoardState, getNextMove } from '../ml';
+import { generateInitialBoardState, getNextMove } from '../ml';
 import { MIN_ATTACK_DELAY, AGENT_SEND_DELAY } from '../config';
 
 const NORMAL_WS_CLOSE = 1000;
@@ -340,31 +342,25 @@ export default class Agent {
    * primitive attack strategy. This strategy attacks from top-left toward
    * the bottom right of the opponent board.
    */
-  private _attackFallback() {
-    log.warn(`Agent ${this.getAgentUUID()} is attempting attack fallback`);
+  private _attackFallback(
+    config: IncomingMessageStruct<ConfigMessagePayload & AttackMessagePayload>
+  ): CellPosition | undefined {
+    log.warn(`Agent ${this.getAgentUUID()} is using attack fallback.`);
+
     const { gridSize } = this.options;
-    const attacks = this.config?.data.player.attacks || [];
-    let attackOrigin: CellPosition | undefined = undefined;
+    const { attacks } = config.data.player;
 
     for (let x = 0; x <= gridSize - 1; x++) {
-      if (attackOrigin) {
-        break;
-      }
-
       for (let y = 0; y <= gridSize - 1; y++) {
         const existingAttack = attacks.find((atk) => {
           return atk.attack.origin[0] === x && atk.attack.origin[1] === y;
         });
 
         if (!existingAttack) {
-          attackOrigin = [x, y];
-          log.trace('set attack origin to: %j', attackOrigin);
-          break;
+          return [x, y];
         }
       }
     }
-
-    return attackOrigin;
   }
 
   /**
@@ -414,7 +410,7 @@ export default class Agent {
       const y = atk.attack.origin[1];
       const isHit = atk.result.hit;
 
-      boardState[x][y] = isHit ? CellState.Hit : CellState.Miss;
+      boardState[x][y] = isHit ? AI.CellState.Hit : AI.CellState.Miss;
     });
 
     log.trace(
@@ -425,45 +421,42 @@ export default class Agent {
       `Agent ${this.getAgentUUID()} hit ships for AI service: %j`,
       hitShips
     );
+    log.debug(
+      `Agent ${this.getAgentUUID()} requesting prediction from AI service`
+    );
 
-    let attackOrigin: CellPosition | undefined;
-    try {
-      log.debug(
-        `Agent ${this.getAgentUUID()} requesting prediction from AI service`
-      );
-      const prediction = await getNextMove(boardState, hitShips);
-      attackOrigin = [prediction.x, prediction.y];
-    } catch (e) {
+    const prediction = await getNextMove(boardState, hitShips);
+    const fallback = this._attackFallback(
+      config as IncomingMessageStruct<
+        ConfigMessagePayload & AttackMessagePayload
+      >
+    );
+    const origin: CellPosition | undefined = prediction
+      ? [prediction.x, prediction.y]
+      : fallback;
+
+    if (!origin) {
       log.error(
-        `Agent ${this.getAgentUUID()} was unable to get an attack prediction from AI service`
+        `Agent ${this.getAgentUUID()} was unable to get an attack prediction from AI service, nor did it determine a fallback. The Agent will be retired.`
       );
-      attackOrigin = this._attackFallback();
-    } finally {
-      if (!attackOrigin) {
-        log.warn(
-          `Agent ${this.getAgentUUID()} was unable to determine a valid attack.`
-        );
-      } else {
-        // The processing time for the prediction service can vary, but we
-        // need to make it seem as though the agent is "thinking" before it
-        // plays its turn. Enforcing a minimum delay will reduce player
-        // frustration. Similarly, read this for a laugh:
-        // https://twitter.com/sharifshameem/status/1344246374737399808
-        const processingTime = Date.now() - attackStartTs;
-        const delay = Math.max(0, MIN_ATTACK_DELAY - processingTime);
+      this.retire();
+    } else {
+      const processingTime = Date.now() - attackStartTs;
+      const delay = Math.max(0, MIN_ATTACK_DELAY - processingTime);
+      const attackPayload: OutgoingAttack = {
+        type: '1x1',
+        origin,
+        prediction
+      };
 
-        log.info(
-          `Agent ${this.getAgentUUID()} attacking after ${delay}ms delay: %j`,
-          attackOrigin
-        );
+      log.info(
+        `Agent ${this.getAgentUUID()} attacking %j after ${delay}ms delay.`,
+        attackPayload.origin
+      );
 
-        setTimeout(() => {
-          this.send(MessageType.Outgoing.Attack, {
-            type: '1x1',
-            origin: attackOrigin
-          });
-        }, delay);
-      }
+      setTimeout(() => {
+        this.send(MessageType.Outgoing.Attack, attackPayload);
+      }, delay);
     }
   }
 

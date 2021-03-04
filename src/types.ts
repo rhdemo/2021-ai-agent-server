@@ -15,6 +15,42 @@ export namespace MessageType {
   }
 }
 
+export namespace AI {
+  export enum CellState {
+    Hit = 2,
+    Miss = 1,
+    NotPlayed = -1
+  }
+
+  export type BoardState = [
+    [CellState, CellState, CellState, CellState, CellState],
+    [CellState, CellState, CellState, CellState, CellState],
+    [CellState, CellState, CellState, CellState, CellState],
+    [CellState, CellState, CellState, CellState, CellState],
+    [CellState, CellState, CellState, CellState, CellState]
+  ];
+
+  export type ProbabilityMatrix = [
+    [number, number, number, number, number],
+    [number, number, number, number, number],
+    [number, number, number, number, number],
+    [number, number, number, number, number],
+    [number, number, number, number, number]
+  ];
+
+  export type PredictionResponse = {
+    prob: ProbabilityMatrix;
+    x: number;
+    y: number;
+  };
+}
+
+export type OutgoingAttack = {
+  type: string;
+  origin: CellPosition;
+  prediction?: AI.PredictionResponse;
+};
+
 export enum ShipType {
   Carrier = 'Carrier',
   Battleship = 'Battleship',
