@@ -73,7 +73,18 @@ export default class Agent {
    */
   public retire() {
     log.info(`Agent ${this.getAgentUUID()} is being retired`);
-    this.socket?.close(NORMAL_WS_CLOSE);
+
+    if (
+      this.socket &&
+      this.socket.readyState in [WebSocket.OPEN, WebSocket.CONNECTING]
+    ) {
+      log.trace(
+        `Agent ${this.getAgentUUID()} socket being closed as part of retirement`
+      );
+      this.socket.removeAllListeners('close');
+      this.socket.close(NORMAL_WS_CLOSE);
+    }
+
     this.options.onRetired();
   }
 
@@ -164,6 +175,7 @@ export default class Agent {
   private onWsClose(code: number) {
     if (code === NORMAL_WS_CLOSE) {
       log.info(`Agent ${this.getAgentUUID()} socket closed normally`);
+      this.retire();
     } else {
       log.warn(
         `Agent ${this.getAgentUUID()} socket closed abnormally with code ${code}`
