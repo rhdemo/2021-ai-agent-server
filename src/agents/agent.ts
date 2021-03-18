@@ -8,7 +8,8 @@ import {
   OutgoingAttack,
   ShipsLayoutData,
   ShipType,
-  AI
+  AI,
+  MatchPhase
 } from '../types';
 import log from '../log';
 import AgentStateMachine, { AgentState } from './agent.state.machine';
@@ -58,6 +59,7 @@ export default class Agent {
     fsm.onEnter(AgentState.Positioning, () => this._callbackPositioning());
     fsm.onEnter(AgentState.WaitingForTurn, () => this._callbackWaitForTurn());
     fsm.onEnter(AgentState.Attacking, () => this._callbackAttack());
+    fsm.onEnter(AgentState.BonusAttack, () => this._callbackAttack());
     fsm.onEnter(AgentState.LostGame, () => this._callbackGameOver(false));
     fsm.onEnter(AgentState.WonGame, () => this._callbackGameOver(true));
 
@@ -211,7 +213,10 @@ export default class Agent {
       this.onConfigurationPayload(
         parsedMessage as IncomingMessageStruct<ConfigMessagePayload>
       );
-    } else if (parsedMessage.type === MessageType.Incoming.AttackResult) {
+    } else if (
+      parsedMessage.type === MessageType.Incoming.AttackResult ||
+      parsedMessage.type === MessageType.Incoming.BonusResult
+    ) {
       this.onAttackResultPayload(
         parsedMessage as IncomingMessageStruct<
           ConfigMessagePayload & AttackMessagePayload
@@ -245,14 +250,23 @@ export default class Agent {
       `agent ${this.getAgentUUID()} received attack response: %j`,
       message
     );
-    const { winner, activePlayer } = message.data.match;
+    const { winner, state } = message.data.match;
     if (winner && winner === this.getAgentUUID()) {
       this.fsm.transitTo(AgentState.WonGame);
     } else if (winner && winner !== this.getAgentUUID()) {
       this.fsm.transitTo(AgentState.LostGame);
-    } else if (activePlayer === this.getAgentUUID()) {
+    } else if (
+      state.activePlayer === this.getAgentUUID() &&
+      state.phase === MatchPhase.Attack
+    ) {
       log.info(`Agent ${this.getAgentUUID()} is due to attack`);
       this.fsm.transitTo(AgentState.Attacking);
+    } else if (
+      state.activePlayer === this.getAgentUUID() &&
+      state.phase === MatchPhase.Bonus
+    ) {
+      log.info(`Agent ${this.getAgentUUID()} is due to bonus attack`);
+      this.fsm.transitTo(AgentState.BonusAttack);
     } else {
       this.fsm.transitTo(AgentState.WaitingForTurn);
     }
@@ -288,7 +302,8 @@ export default class Agent {
    * overall game state is set to "active"
    */
   private isAppropriateToAttack() {
-    const isTurn = this.config?.data.match.activePlayer === this.getAgentUUID();
+    const isTurn =
+      this.config?.data.match.state.activePlayer === this.getAgentUUID();
     const isActive = this.config?.data.game.state === 'active';
 
     return isActive && isTurn;
@@ -385,78 +400,85 @@ export default class Agent {
       return this.fsm.transitTo(AgentState.WaitingForConfig);
     }
 
-    const attackStartTs = Date.now();
-
-    log.debug(`Agent ${this.getAgentUUID()} determining attack cell`);
-
-    const boardState = generateInitialBoardState();
-    const hitShips = Object.keys(config.data.opponent.board).map((ship) => {
-      const { type, cells } = config.data.opponent.board[ship as ShipType];
-
-      return {
-        type,
-        cells: cells.map((c) => c.origin)
-      };
-    });
-    const attacks = config.data.player.attacks;
-
-    attacks.forEach((atk) => {
-      log.trace(
-        `Agent ${this.getAgentUUID()} updating board state based on attack: %j`,
-        atk
-      );
-
-      const x = atk.attack.origin[0];
-      const y = atk.attack.origin[1];
-      const isHit = atk.result.hit;
-
-      boardState[x][y] = isHit ? AI.CellState.Hit : AI.CellState.Miss;
-    });
-
-    log.trace(
-      `Agent ${this.getAgentUUID()} board state for AI service: %j`,
-      boardState
-    );
-    log.trace(
-      `Agent ${this.getAgentUUID()} hit ships for AI service: %j`,
-      hitShips
-    );
-    log.debug(
-      `Agent ${this.getAgentUUID()} requesting prediction from AI service`
-    );
-
-    const prediction = await getNextMove(boardState, hitShips);
-    const fallback = this._attackFallback(
-      config as IncomingMessageStruct<
-        ConfigMessagePayload & AttackMessagePayload
-      >
-    );
-    const origin: CellPosition | undefined = prediction
-      ? [prediction.x, prediction.y]
-      : fallback;
-
-    if (!origin) {
-      log.error(
-        `Agent ${this.getAgentUUID()} was unable to get an attack prediction from AI service, nor did it determine a fallback. The Agent will be retired.`
-      );
-      this.retire();
+    if (config.data.match.state.phase === MatchPhase.Bonus) {
+      // It's a bonus round. AI agent doesn't do anything for this
+      log.info(`Agent ${this.getAgentUUID()} sending default bonus payload`);
+      this.send(MessageType.Outgoing.Bonus, { hits: 0 });
     } else {
-      const processingTime = Date.now() - attackStartTs;
-      const delay = Math.max(0, MIN_ATTACK_DELAY - processingTime);
-      const attackPayload: OutgoingAttack = {
-        type: '1x1',
-        origin,
-        prediction
-      };
+      // Launch a regular attack
+      const attackStartTs = Date.now();
 
-      log.info(
-        `Agent ${this.getAgentUUID()} attacking %j after ${delay}ms delay.`,
-        attackPayload.origin
+      log.debug(`Agent ${this.getAgentUUID()} determining attack cell`);
+
+      const boardState = generateInitialBoardState();
+      const hitShips = Object.keys(config.data.opponent.board).map((ship) => {
+        const { type, cells } = config.data.opponent.board[ship as ShipType];
+
+        return {
+          type,
+          cells: cells.map((c) => c.origin)
+        };
+      });
+      const attacks = config.data.player.attacks;
+
+      attacks.forEach((atk) => {
+        log.trace(
+          `Agent ${this.getAgentUUID()} updating board state based on attack: %j`,
+          atk
+        );
+
+        const x = atk.attack.origin[0];
+        const y = atk.attack.origin[1];
+        const isHit = atk.result.hit;
+
+        boardState[x][y] = isHit ? AI.CellState.Hit : AI.CellState.Miss;
+      });
+
+      log.trace(
+        `Agent ${this.getAgentUUID()} board state for AI service: %j`,
+        boardState
+      );
+      log.trace(
+        `Agent ${this.getAgentUUID()} hit ships for AI service: %j`,
+        hitShips
+      );
+      log.debug(
+        `Agent ${this.getAgentUUID()} requesting prediction from AI service`
       );
 
-      setTimeout(() => {
-        this.send(MessageType.Outgoing.Attack, attackPayload);
-      }, delay);
+      const prediction = await getNextMove(boardState, hitShips);
+      const fallback = this._attackFallback(
+        config as IncomingMessageStruct<
+          ConfigMessagePayload & AttackMessagePayload
+        >
+      );
+      const origin: CellPosition | undefined = prediction
+        ? [prediction.x, prediction.y]
+        : fallback;
+
+      if (!origin) {
+        log.error(
+          `Agent ${this.getAgentUUID()} was unable to get an attack prediction from AI service, nor did it determine a fallback. The Agent will be retired.`
+        );
+        this.retire();
+      } else {
+        const processingTime = Date.now() - attackStartTs;
+        const delay = Math.max(0, MIN_ATTACK_DELAY - processingTime);
+        const attackPayload: OutgoingAttack = {
+          type: '1x1',
+          origin,
+          prediction
+        };
+
+        log.info(
+          `Agent ${this.getAgentUUID()} attacking %j after ${delay}ms delay.`,
+          attackPayload.origin
+        );
+
+        setTimeout(() => {
+          this.send(MessageType.Outgoing.Attack, attackPayload);
+        }, delay);
+      }
     }
   }
 
