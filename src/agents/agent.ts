@@ -16,6 +16,8 @@ import { generateInitialBoardState, getNextMove } from '../ml';
 import { MIN_ATTACK_DELAY, AGENT_SEND_DELAY } from '../config';
 
 const NORMAL_WS_CLOSE = 1000;
+const MAX_CONNECT_ATTEMPTS = 12;
+const RECONNECT_DELAY = 5000;
 
 export type AgentInitialisationOptions = {
   uuid: string;
@@ -30,6 +32,7 @@ export type AgentInitialisationOptions = {
  * govern its behaviour.
  */
 export default class Agent {
+  private connectAttempts = 0;
   private fsm: AgentStateMachine;
   private socket: WebSocket | undefined;
   private config:
@@ -107,6 +110,7 @@ export default class Agent {
     // in a callback. Use process.nextTick to delay the state change until
     // after the StateMachine has finished executing the transition tasks
     process.nextTick(() => {
+      this.connectAttempts = 0;
       log.info(`Agent ${this.getAgentUUID()} sending connection payload`);
       this.send(MessageType.Outgoing.Connection, {
         username: this.options.username,
@@ -121,7 +125,10 @@ export default class Agent {
    * If the Agent is disconnected it'll wait a while and attempt to reconnect
    */
   private _callbackDisconnected() {
-    setTimeout(() => this.fsm.transitTo(AgentState.Connecting), 5000);
+    setTimeout(
+      () => this.fsm.transitTo(AgentState.Connecting),
+      RECONNECT_DELAY
+    );
   }
 
   /**
@@ -160,13 +167,22 @@ export default class Agent {
   private _callbackConnecting() {
     const { uuid } = this.options;
 
-    log.info(`Agent ${uuid} connecting to ${this.options.wsUrl}`);
-
-    this.socket = new WebSocket(this.options.wsUrl);
-    this.socket.on('open', () => this.fsm.transitTo(AgentState.Connected));
-    this.socket.on('error', (e) => this.onWsError(e));
-    this.socket.on('close', (code) => this.onWsClose(code));
-    this.socket.on('message', (message) => this.onWsMessage(message));
+    if (this.connectAttempts > MAX_CONNECT_ATTEMPTS) {
+      log.warn(
+        `Agent ${this.getAgentUUID()} failed to connect after ${MAX_CONNECT_ATTEMPTS} attempts. Retiring.`
+      );
+      this.retire();
+    } else {
+      this.connectAttempts += 1;
+      log.info(
+        `Agent ${uuid} connecting to ${this.options.wsUrl}. Attempt #${this.connectAttempts}`
+      );
+      this.socket = new WebSocket(this.options.wsUrl);
+      this.socket.on('open', () => this.fsm.transitTo(AgentState.Connected));
+      this.socket.on('error', (e) => this.onWsError(e));
+      this.socket.on('close', (code) => this.onWsClose(code));
+      this.socket.on('message', (message) => this.onWsMessage(message));
+    }
   }
 
   /**
