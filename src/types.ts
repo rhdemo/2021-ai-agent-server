@@ -2,11 +2,13 @@ export namespace MessageType {
   export enum Outgoing {
     Connection = 'connection',
     ShipPositions = 'ship-positions',
-    Attack = 'attack'
+    Attack = 'attack',
+    Bonus = 'bonus'
   }
 
   export enum Incoming {
     AttackResult = 'attack-result',
+    BonusResult = 'bonus-result',
     ServerError = 'server-error',
     BadMessageType = 'bad-message-type',
     BadPayload = 'invalid-payload',
@@ -80,6 +82,23 @@ export type ShipStateData = {
   } & ShipPositionData;
 };
 
+export type TurnState = {
+  phase: MatchPhase;
+
+  // The player whose UUID is set here is allowed to attack
+  activePlayer: string;
+  // If the bonus is set to a ship type then the client will
+  // trigger a bonus round attack against that ship
+  bonus?: ShipType;
+};
+
+export enum MatchPhase {
+  NotReady = 'not-ready',
+  Attack = 'attack',
+  Bonus = 'bonus',
+  Finished = 'finished'
+}
+
 export type ConfigMessagePayload = {
   game: {
     uuid: string;
@@ -116,7 +135,7 @@ export type ConfigMessagePayload = {
     uuid: string;
     ready: boolean;
     // Changes between the player and opponent UUIDs
-    activePlayer: string;
+    state: TurnState;
     // Eventually gets set to the player or opponent UUID
     winner?: string;
   };

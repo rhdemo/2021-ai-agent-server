@@ -9,6 +9,7 @@ export enum AgentState {
   Positioning = 'Positioning',
   WaitingForTurn = 'WaitingForTurn',
   Attacking = 'Attacking',
+  BonusAttack = 'BonusAttack',
   WonGame = 'WonGame',
   LostGame = 'LostGame'
 }
@@ -91,15 +92,30 @@ export default class AgentStateMachine extends StateMachine<{}, AgentState> {
    *  * "Disconnected" if the connection drops, or the game is "paused"/"stopped"
    *  * "WaitingForTurn" when the Agent has attacked and turns change
    *  * "WaitingForConfig" when the the admins pause the game
+   *  * "BonusAttack" when the the agent sinks a ship
    *  * "WonGame" if the Agent has sunk all the opponent ships
    */
   @StateMachine.extend(StateMachine.INITIAL, [
     AgentState.Disconnected,
     AgentState.WaitingForTurn,
     AgentState.WaitingForConfig,
+    AgentState.BonusAttack,
     AgentState.WonGame
   ])
   [AgentState.Attacking]: AgentStateData = {};
+
+  /**
+   * Bonus state can transition to:
+   *  * "Disconnected" if the connection drops, or the game is "paused"/"stopped"
+   *  * "WaitingForTurn" when the Agent has attacked and turns change
+   *  * "WaitingForConfig" when the the admins pause the game
+   */
+  @StateMachine.extend(StateMachine.INITIAL, [
+    AgentState.Disconnected,
+    AgentState.WaitingForTurn,
+    AgentState.WaitingForConfig
+  ])
+  [AgentState.BonusAttack]: AgentStateData = {};
 
   /**
    * Win/Lost states do not transition to another state.
