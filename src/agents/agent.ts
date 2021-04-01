@@ -156,11 +156,11 @@ export default class Agent {
   }
 
   private _callbackWaitForConfig() {
-    log.info(`Agent ${this.getAgentUUID()} waiting for config`);
+    log.debug(`Agent ${this.getAgentUUID()} waiting for config`);
   }
 
   private _callbackWaitForTurn() {
-    log.info(`Agent ${this.getAgentUUID()} waiting for their turn`);
+    log.debug(`Agent ${this.getAgentUUID()} waiting for their turn`);
   }
 
   /**
@@ -280,7 +280,7 @@ export default class Agent {
       state.activePlayer === this.getAgentUUID() &&
       state.phase === MatchPhase.Attack
     ) {
-      log.info(`Agent ${this.getAgentUUID()} is due to attack`);
+      log.debug(`Agent ${this.getAgentUUID()} is due to attack`);
       this.fsm.transitTo(AgentState.Attacking);
     } else if (
       state.activePlayer === this.getAgentUUID() &&
