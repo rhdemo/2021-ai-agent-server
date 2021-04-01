@@ -48,7 +48,7 @@ export default class Agent {
     // Configure logging for all state changes
     Object.values(AgentState).forEach((stateName) => {
       fsm.onEnter(stateName, () =>
-        log.info(`Agent ${this.getAgentUUID()} entering state: ${stateName}`)
+        log.debug(`Agent ${this.getAgentUUID()} entering state: ${stateName}`)
       );
     });
 
