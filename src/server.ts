@@ -1,8 +1,8 @@
 import fastify from 'fastify';
-import { HTTP_PORT } from './config';
+import { HTTP_PORT, NODE_ENV } from './config';
 
 const { version } = require('../package.json');
-const app = fastify({ logger: true });
+const app = fastify({ logger: NODE_ENV !== 'prod' });
 
 // Provides a health endpoint to check
 app.register(require('./plugins/health'), {
