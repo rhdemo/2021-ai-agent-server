@@ -58,6 +58,7 @@ export async function getNextMove(
     log.trace(`POST request to AI service at ${PREDICTION_URL}: %j`, json);
 
     const response = await http(PREDICTION_URL, {
+      timeout: 5000,
       method: 'POST',
       responseType: 'json',
       json
@@ -67,6 +68,13 @@ export async function getNextMove(
       `HTTP ${response.statusCode} response, and body: %j`,
       response.body
     );
+
+    if (response.statusCode !== 200) {
+      log.warn(
+        `received ${response.statusCode} from AI service, and body: %j`,
+        response.body
+      );
+    }
 
     // TODO: validation and better error handling
     return response.body as AI.PredictionResponse;
