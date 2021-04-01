@@ -381,8 +381,6 @@ export default class Agent {
   private _attackFallback(
     config: IncomingMessageStruct<ConfigMessagePayload & AttackMessagePayload>
   ): CellPosition | undefined {
-    log.warn(`Agent ${this.getAgentUUID()} is using attack fallback.`);
-
     const { gridSize } = this.options;
     const { attacks } = config.data.player;
 
