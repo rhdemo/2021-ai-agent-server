@@ -239,7 +239,12 @@ export default class Agent {
         >
       );
     } else if (parsedMessage.type === MessageType.Incoming.Heartbeat) {
-      log.trace(`received heartbeat for agent ${this.getAgentUUID()}`);
+      log.trace(`agent ${this.getAgentUUID()} received heartbeat`);
+    } else if (parsedMessage.type === MessageType.Incoming.ScoreUpdate) {
+      log.trace(
+        `agent ${this.getAgentUUID()} received score update: %j`,
+        message
+      );
     } else {
       log.warn(
         `agent ${this.getAgentUUID()} received a message that could not be handled: %j`,

@@ -13,7 +13,8 @@ export namespace MessageType {
     BadMessageType = 'bad-message-type',
     BadPayload = 'invalid-payload',
     Heartbeat = 'heartbeat',
-    Configuration = 'configuration'
+    Configuration = 'configuration',
+    ScoreUpdate = 'score-update'
   }
 }
 
