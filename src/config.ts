@@ -16,27 +16,11 @@ const config = {
     .default('ws://game-server.frontend.svc.cluster.local:8080/game')
     .asUrlString(),
 
-  AI_SERVER_URL: get('AI_SERVER_URL')
-    .default('http://bataai.ai.svc.cluster.local:8080/')
-    .asUrlString(),
+  AI_SERVER_URL: get('AI_SERVER_URL').required().asUrlString(),
 
   MIN_ATTACK_DELAY: get('MIN_ATTACK_DELAY').default(3500).asIntPositive(),
 
-  AGENT_SEND_DELAY: get('AGENT_SEND_DELAY').default(500).asIntPositive(),
-
-  DATAGRID_GAME_DATA_STORE: get('DATAGRID_GAME_DATA_STORE')
-    .default('game')
-    .asString(),
-  DATAGRID_GAME_DATA_KEY: get('DATAGRID_GAME_DATA_KEY')
-    .default('current-game')
-    .asString(),
-  DATAGRID_PLAYER_DATA_STORE: get('DATAGRID_PLAYER_DATA_STORE')
-    .default('players')
-    .asString(),
-  DATAGRID_HOST: get('DATAGRID_HOST').default('infinispan').asString(),
-  DATAGRID_HOTROD_PORT: get('DATAGRID_HOTROD_PORT')
-    .default(11222)
-    .asPortNumber()
+  AGENT_SEND_DELAY: get('AGENT_SEND_DELAY').default(500).asIntPositive()
 };
 
 export = config;
