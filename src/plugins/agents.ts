@@ -25,7 +25,7 @@ const agentPlugin: FastifyPluginCallback = (server, options, done) => {
         });
       } else {
         reply.send({
-          info: 'agent was created previosuly'
+          info: 'agent was created previously'
         });
       }
     }
