@@ -96,7 +96,7 @@ export default class Agent {
   }
 
   public getAgentUUID() {
-    return this.options.uuid;
+    return this.config?.data.player.uuid || this.options.uuid;
   }
 
   public getAgentGameId() {
