@@ -108,7 +108,7 @@ export type ConfigMessagePayload = {
   };
   opponent: {
     username: string;
-    board: ShipStateData;
+    board: { valid: boolean; positions: ShipStateData };
   };
   player: {
     uuid: string;

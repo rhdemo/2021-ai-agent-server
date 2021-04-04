@@ -152,6 +152,7 @@ export default class Agent {
   }
 
   private _callbackPositioning() {
+    log.debug(`Agent ${this.getAgentUUID()} sending ship positions`);
     this.send(MessageType.Outgoing.ShipPositions, this.getShipPositions());
   }
 
@@ -304,7 +305,7 @@ export default class Agent {
     log.trace(`Agent ${this.getAgentUUID()} stored new config: %j`, message);
 
     if (state === 'paused' || state === 'stopped') {
-      this.fsm.transitTo(AgentState.WaitingForConfig, state);
+      this.fsm.transitTo(AgentState.WaitingForConfig);
     } else if (this.hasSetValidShipPositions()) {
       // Agent has successfully set positions, prepare to attack, or wait for turn
       if (this.isAppropriateToAttack()) {
@@ -313,8 +314,17 @@ export default class Agent {
         this.fsm.transitTo(AgentState.WaitingForTurn);
       }
     } else {
-      log.trace(`Agent ${this.getAgentUUID()} must set positions.`);
-      this.fsm.transitTo(AgentState.Positioning);
+      if (message.data.opponent.board.valid) {
+        log.trace(
+          `Agent ${this.getAgentUUID()} opponent has set valid positions. Now agent will set theirs.`
+        );
+        this.fsm.transitTo(AgentState.Positioning);
+      } else {
+        log.trace(
+          `Agent ${this.getAgentUUID()} is waiting for opponent to set valid positions.`
+        );
+        this.fsm.transitTo(AgentState.WaitingForConfig);
+      }
     }
   }
 
@@ -430,14 +440,18 @@ export default class Agent {
       log.debug(`Agent ${this.getAgentUUID()} determining attack cell`);
 
       const boardState = generateInitialBoardState();
-      const hitShips = Object.keys(config.data.opponent.board).map((ship) => {
-        const { type, cells } = config.data.opponent.board[ship as ShipType];
+      const hitShips = Object.keys(config.data.opponent.board.positions).map(
+        (ship) => {
+          const { type, cells } = config.data.opponent.board.positions[
+            ship as ShipType
+          ];
 
-        return {
-          type,
-          cells: cells.map((c) => c.origin)
-        };
-      });
+          return {
+            type,
+            cells: cells.map((c) => c.origin)
+          };
+        }
+      );
       const attacks = config.data.player.attacks;
 
       attacks.forEach((atk) => {
