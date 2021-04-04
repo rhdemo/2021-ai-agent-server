@@ -314,9 +314,9 @@ export default class Agent {
         this.fsm.transitTo(AgentState.WaitingForTurn);
       }
     } else {
-      if (message.data.opponent.board.valid) {
+      if (this.isHumanLikePlayer() || message.data.opponent.board.valid) {
         log.trace(
-          `Agent ${this.getAgentUUID()} opponent has set valid positions. Now agent will set theirs.`
+          `Agent ${this.getAgentUUID()} opponent has set valid positions or this Agent is "human-like". Agent will set positions.`
         );
         this.fsm.transitTo(AgentState.Positioning);
       } else {
@@ -326,6 +326,23 @@ export default class Agent {
         this.fsm.transitTo(AgentState.WaitingForConfig);
       }
     }
+  }
+
+  /**
+   * Used to determine if the player was created as a bot, i.e it is
+   * masquerading as a human player.
+   *
+   * The easiest way to determine this is if "uuid" in options is undefined.
+
+   * Agents created by the game server have pre-assigned UUID and are
+   * considered to be "AI" controlled, where as Agents created manually and
+   * without a pre-assigned UUID, e.g by a load test script appear to the game
+   * server as "human" players.
+   *
+   * @returns {boolean}
+   */
+  private isHumanLikePlayer() {
+    return this.options.uuid === undefined;
   }
 
   /**
