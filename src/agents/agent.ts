@@ -346,15 +346,18 @@ export default class Agent {
   }
 
   /**
-   * The agent should only attempt to attack if it's their turn AND the
-   * overall game state is set to "active"
+   * The agent should only attempt to attack if it's their turn, AND the
+   * overall game state is set to "active", AND the match phase is set to
+   * "attack"
    */
   private isAppropriateToAttack() {
     const isTurn =
       this.config?.data.match.state.activePlayer === this.getAgentUUID();
     const isActive = this.config?.data.game.state === 'active';
+    const isAttackPhase =
+      this.config?.data.match.state.phase === MatchPhase.Attack;
 
-    return isActive && isTurn;
+    return isActive && isTurn && isAttackPhase;
   }
 
   /**
