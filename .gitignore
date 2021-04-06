@@ -1,6 +1,7 @@
 # Ignore the built files
 build/
 *.js
+!scripts/*.js
 
 # Logs
 logs
