@@ -9,7 +9,8 @@ import {
   ShipsLayoutData,
   ShipType,
   AI,
-  MatchPhase
+  MatchPhase,
+  GameConfig
 } from '../types';
 import log from '../log';
 import AgentStateMachine, { AgentState } from './agent.state.machine';
@@ -246,6 +247,12 @@ export default class Agent {
         `agent ${this.getAgentUUID()} received score update: %j`,
         message
       );
+    } else if (
+      parsedMessage.type === MessageType.Incoming.GameState &&
+      this.config?.data.game
+    ) {
+      // This payload is sent when the overall demo/game is paused, stopped, etc.
+      this.config.data.game = parsedMessage.data as GameConfig;
     } else {
       log.warn(
         `agent ${this.getAgentUUID()} received a message that could not be handled: %j`,

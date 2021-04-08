@@ -14,6 +14,7 @@ export namespace MessageType {
     BadPayload = 'invalid-payload',
     Heartbeat = 'heartbeat',
     Configuration = 'configuration',
+    GameState = 'game-state',
     ScoreUpdate = 'score-update'
   }
 }
@@ -100,12 +101,14 @@ export enum MatchPhase {
   Finished = 'finished'
 }
 
+export type GameConfig = {
+  uuid: string;
+  date: string;
+  state: 'lobby' | 'active' | 'paused' | 'stopped';
+};
+
 export type ConfigMessagePayload = {
-  game: {
-    uuid: string;
-    date: string;
-    state: 'lobby' | 'active' | 'paused' | 'stopped';
-  };
+  game: GameConfig;
   opponent: {
     username: string;
     board: { valid: boolean; positions: ShipStateData };
