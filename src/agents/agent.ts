@@ -10,7 +10,7 @@ import {
   ShipType,
   AI,
   MatchPhase,
-  GameConfig
+  GameStateMessagePayload
 } from '../types';
 import log from '../log';
 import AgentStateMachine, { AgentState } from './agent.state.machine';
@@ -35,6 +35,7 @@ export type AgentInitialisationOptions = {
  */
 export default class Agent {
   private connectAttempts = 0;
+  private sendTimeout: NodeJS.Timeout | undefined;
   private fsm: AgentStateMachine;
   private socket: WebSocket | undefined;
   private config:
@@ -247,16 +248,50 @@ export default class Agent {
         `agent ${this.getAgentUUID()} received score update: %j`,
         message
       );
-    } else if (
-      parsedMessage.type === MessageType.Incoming.GameState &&
-      this.config?.data.game
-    ) {
+    } else if (parsedMessage.type === MessageType.Incoming.GameState) {
       // This payload is sent when the overall demo/game is paused, stopped, etc.
-      this.config.data.game = parsedMessage.data as GameConfig;
+      this.onGameStatePayload(
+        parsedMessage as IncomingMessageStruct<GameStateMessagePayload>
+      );
     } else {
       log.warn(
         `agent ${this.getAgentUUID()} received a message that could not be handled: %j`,
         parsedMessage
+      );
+    }
+  }
+
+  private onGameStatePayload(
+    message: IncomingMessageStruct<GameStateMessagePayload>
+  ) {
+    const { state } = message.data.game;
+
+    if (this.config) {
+      this.config.data.game = message.data.game;
+
+      if (state === 'paused') {
+        if (this.sendTimeout) {
+          // Cancel any pending message that was queued
+          global.clearTimeout(this.sendTimeout);
+        }
+
+        // Set the agent into a waiting state
+        this.fsm.transitTo(AgentState.WaitingForConfig);
+      } else if (state === 'active') {
+        // Bit of a hack, but basically have the agent act on the current
+        // config that it has since the game has been resumed. It should
+        // place ships, attack, or wait for its turn...
+        this.onConfigurationPayload(this.config);
+      } else {
+        log.info(
+          `agent ${this.getAgentUUID()} is being retired since game entered "${state}" state`
+        );
+        this.retire();
+      }
+    } else {
+      log.warn(
+        `agent ${this.getAgentUUID()} received game state update before a configuration payload. Payload was: %j`,
+        message
       );
     }
   }
@@ -523,7 +558,8 @@ export default class Agent {
         this.retire();
       } else {
         const processingTime = Date.now() - attackStartTs;
-        const delay = Math.max(0, MIN_ATTACK_DELAY - processingTime);
+        const delay =
+          Math.max(0, MIN_ATTACK_DELAY - processingTime) + AGENT_SEND_DELAY;
         const attackPayload: OutgoingAttack = {
           type: '1x1',
           origin,
@@ -535,9 +571,7 @@ export default class Agent {
           attackPayload.origin
         );
 
-        setTimeout(() => {
-          this.send(MessageType.Outgoing.Attack, attackPayload);
-        }, delay);
+        this.send(MessageType.Outgoing.Attack, attackPayload, delay);
       }
     }
   }
@@ -547,10 +581,14 @@ export default class Agent {
    * @param type
    * @param data
    */
-  private send(type: MessageType.Outgoing, data: unknown) {
+  private send(
+    type: MessageType.Outgoing,
+    data: unknown,
+    delay = AGENT_SEND_DELAY
+  ) {
     // The game server enforces a mutex on message processing. Sometimes the
     // agent is too fast and messages are rejected. Delay sending slightly.
-    setTimeout(() => {
+    this.sendTimeout = global.setTimeout(() => {
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         log.trace(
           `Agent ${this.getAgentUUID()} sending "${type}" with payload: %j`,
@@ -568,6 +606,6 @@ export default class Agent {
           data
         );
       }
-    }, AGENT_SEND_DELAY);
+    }, delay);
   }
 }

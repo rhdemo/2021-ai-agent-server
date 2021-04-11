@@ -104,7 +104,7 @@ export enum MatchPhase {
 export type GameConfig = {
   uuid: string;
   date: string;
-  state: 'lobby' | 'active' | 'paused' | 'stopped';
+  state: 'lobby' | 'active' | 'paused' | 'replay' | 'stopped';
 };
 
 export type ConfigMessagePayload = {
@@ -154,6 +154,10 @@ export type AttackMessagePayload = {
     destroyed?: boolean;
     type?: ShipType;
   }[];
+};
+
+export type GameStateMessagePayload = {
+  game: GameConfig;
 };
 
 export interface IncomingMessageStruct<T> {
