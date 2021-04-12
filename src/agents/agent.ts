@@ -1,4 +1,4 @@
-import WebSocket, { CloseEvent } from 'ws';
+import WebSocket from 'ws';
 import {
   AttackMessagePayload,
   CellPosition,
@@ -18,7 +18,7 @@ import { generateInitialBoardState, getNextMove } from '../ml';
 import { MIN_ATTACK_DELAY, AGENT_SEND_DELAY } from '../config';
 
 const NORMAL_WS_CLOSE = 1000;
-const MAX_CONNECT_ATTEMPTS = 12;
+const MAX_CONNECT_ATTEMPTS = 4;
 const RECONNECT_DELAY = 5000;
 
 export type AgentInitialisationOptions = {

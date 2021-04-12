@@ -8,49 +8,38 @@ type AgentOptions = {
   uuid: string;
   username: string;
   gameId: string;
+  wsUrl?: string;
 };
 
-export enum AgentCreationResponse {
-  Created,
-  Existed
-}
-
-export function createAgent(opts: AgentOptions): AgentCreationResponse {
-  const { uuid, gameId } = opts;
+export function createAgent(opts: AgentOptions) {
+  const { uuid, wsUrl = GAME_SERVER_URL } = opts;
   const existingAgent = agents.get(uuid);
 
-  if (
-    existingAgent &&
-    existingAgent.getAgentUUID() === uuid &&
-    existingAgent.getAgentGameId() === gameId
-  ) {
-    log.info(
-      `An agent with the UUID ${uuid} for game ${gameId} already exists. Skipping creation.`
+  if (existingAgent) {
+    // Retire the old agent. This is the safest course of action since the
+    // new agent might need to connect to a new game-server pod/host, etc.
+    log.warn(
+      `An agent with the UUID ${uuid} existed already. Deleting this stale agent.`
     );
 
-    return AgentCreationResponse.Existed;
-  } else {
-    if (existingAgent) {
-      log.warn(
-        `An agent with the UUID ${uuid} existed for a previous game. Deleting this stale agent.`
-      );
-      agents.delete(uuid);
-    }
-
-    log.info(`Creating agent ${uuid} with opts: %j`, opts);
-
-    const agent = new Agent({
-      ...opts,
-      wsUrl: GAME_SERVER_URL,
-      gridSize: GAME_GRID_SIZE,
-      // Remove agent from the Map the they have won/lost
-      onRetired: () => agents.delete(uuid)
-    });
-
-    agents.set(uuid, agent);
-
-    return AgentCreationResponse.Created;
+    existingAgent.retire();
   }
+
+  log.info(
+    `Creating agent ${uuid} with opts for game %s: %j`,
+    opts.gameId,
+    opts
+  );
+
+  const agent = new Agent({
+    ...opts,
+    wsUrl,
+    gridSize: GAME_GRID_SIZE,
+    // Remove agent from the Map the they have won/lost
+    onRetired: () => agents.delete(uuid)
+  });
+
+  agents.set(uuid, agent);
 }
 
 export function getAgentCount() {
