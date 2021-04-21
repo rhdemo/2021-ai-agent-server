@@ -4,6 +4,7 @@ import { AI, ShipType, CellPosition } from '../types';
 import http from './http';
 
 const PREDICTION_URL = new URL('/prediction', AI_SERVER_URL).toString();
+const HTTP_DELAY_WARNING_MS = 1500;
 
 export function generateInitialBoardState(): AI.BoardState {
   return [
@@ -57,12 +58,18 @@ export async function getNextMove(
 
     log.trace(`POST request to AI service at ${PREDICTION_URL}: %j`, json);
 
+    const start = Date.now();
     const response = await http(PREDICTION_URL, {
       timeout: 5000,
       method: 'POST',
       responseType: 'json',
       json
     });
+    const reqTime = Date.now() - start;
+
+    if (reqTime >= HTTP_DELAY_WARNING_MS) {
+      log.warn(`AI move service response was ${reqTime}ms`);
+    }
 
     log.trace(
       `HTTP ${response.statusCode} response, and body: %j`,
