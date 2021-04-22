@@ -146,7 +146,10 @@ export default class Agent {
         this.config?.data.match.uuid
       })`
     );
-    this.retire();
+
+    // Disconnect after a moment. This gives the game-server time to
+    // send updates, scores, etc. if it's a little backed up
+    setTimeout(() => this.retire(), 10000);
   }
 
   private _callbackAttack() {
