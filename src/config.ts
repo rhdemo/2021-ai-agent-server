@@ -18,7 +18,7 @@ const config = {
 
   AI_SERVER_URL: get('AI_SERVER_URL').required().asUrlString(),
 
-  MIN_ATTACK_DELAY: get('MIN_ATTACK_DELAY').default(4000).asIntPositive(),
+  MIN_ATTACK_DELAY: get('MIN_ATTACK_DELAY').default(3250).asIntPositive(),
 
   AGENT_SEND_DELAY: get('AGENT_SEND_DELAY').default(1000).asIntPositive()
 };
