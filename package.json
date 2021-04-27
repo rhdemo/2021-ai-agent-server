@@ -5,7 +5,8 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "bots": "npm run build && node scripts/bots.js | pino-pretty -t",
+    "bots:local": "npm run build && node scripts/bots.js | pino-pretty -t",
+    "bots:openshift": "node scripts/bots.js",
     "build": "tsc",
     "dev": "NODE_ENV=dev LOG_LEVEL=trace GAME_SERVER_URL=ws://summit-frontend-wss:3000/game nodemon -e ts -x ts-node src/index.ts | pino-pretty -t",
     "start": "node build/index.js",
