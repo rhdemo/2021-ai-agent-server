@@ -400,7 +400,7 @@ export default class Agent {
       this.config?.data.match.state.activePlayer === this.getAgentUUID();
     const isActive = this.config?.data.game.state === 'active';
     const isAttackPhase =
-      this.config?.data.match.state.phase === MatchPhase.Attack;
+      this.config?.data.match.state.phase === MatchPhase.Attack || this.config?.data.match.state.phase === MatchPhase.Bonus;
 
     return isActive && isTurn && isAttackPhase;
   }
